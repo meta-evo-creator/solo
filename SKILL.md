@@ -1,19 +1,33 @@
 ---
 name: solo
+version: 2.2.0
 description: |
-  SOLO v2.1 — TAFA 权能三分架构·工程化实践。权层(Rule)定规则不执行，能层(Execution)执行不监督，审层(Audit)监督不执行。三层互锁闭环，原生OpenClaw。
-version: 2.1.0
+  SOLO v2.2 — TAFA Triple-Power Separation Architecture. Rule layer sets rules without executing, Execution layer executes without supervising, Audit layer supervises without executing. Three-layer interlocked闭环, native OpenClaw + Hermes.
+platforms:
+  - openclaw
+  - hermes
+tools:
+  - sessions_spawn
+  - delegate_task
+  - skill_manage
+  - cron
+  - read
 metadata:
   openclaw:
-    emoji: ⚡
-    requires: {}
+    emoji: ⛳
+  hermes:
+    emoji: ⛳
+    features:
+      - delegate_task_pipeline
+      - native_qqbot_delivery
 ---
 
-# SOLO v2.1 ⚡ — TAFA 权能三分架构·工程化实践
+# SOLO v2.2 ⚡ — TAFA 权能三分架构·工程化实践
 
 > **One person, an entire agent army.**
 > 权层定规则，能层干实事，审层管审计。制定规则的人不执行，执行规则的人不监督，监督执行的人不参与执行。
 > **655（6铁律+5原则+5MEV）全部归属权层——它是规则体系，不是SOLO的全部。**
+> **v2.2 Hermes适配：审层管线→delegate_task · 推送→QQ Bot · 权层→skill_manage**
 
 ---
 
@@ -80,7 +94,7 @@ metadata:
 ### 1.2 规则变更流程
 
 ```
-审层提案 → 石冰审批 → 权层追加 → 能层下次执行时自动加载
+审层提案 → 审批 → 权层追加 → 能层下次执行时自动加载
                                   ↑
                          审层每日审计校验是否已执行
 ```
@@ -218,12 +232,16 @@ DONE <路径>
 
 **独立技能：** `skills/solo-audit/SKILL.md`
 
-| 属性 | 规则 |
-|:-----|:------|
-| 模型 | Pro（强制） |
-| 工具 | 只读 allowlist（禁止 write/edit/create_media/sessions_send） |
-| 产出 | 只提提案，不走执行路径 |
-| 周期 | 每日22:00（SOLO每日审计cron） |
+| 属性 | OpenClaw | Hermes |
+|:-----|:---------|:-------|
+| 模型 | Pro（强制） | Pro（强制） |
+| Agent 管线 | sessions_spawn | **delegate_task** |
+| 推送 | wecom_mcp | **QQ Bot（原生交付）** |
+| 工具 | 只读 allowlist | 只读 allowlist |
+| 产出 | 只提提案 | 只提提案 |
+| 周期 | 每日22:00 | 每日22:00 |
+
+> **v2.2:** Hermes 上审层使用 `delegate_task` 替代 `sessions_spawn`，推送通过 cron 原生 QQ Bot 交付。
 
 ### 3.2 五表对标
 
@@ -289,7 +307,7 @@ Step 3: 石冰审批——修改前展示·审批通过后才执行
     → 执行产出写入审计仓库
     → 审层每日读取审计仓库
     → 审层输出审计提案到 memory/audit/archive/
-    → 审计提案经石冰审批
+    → 审计提案经审批
     → 审批通过的规则变更追加到权层
     → 回到第一步
 ```
@@ -316,6 +334,7 @@ Step 3: 石冰审批——修改前展示·审批通过后才执行
 
 | 版本 | 日期 | 变化 |
 |:-----|:----:|:------|
+| **2.2.0** | **07-19** | **Hermes 全平台适配。审层管线 sessions_spawn→delegate_task · 推送 wecom_mcp→QQ Bot · 降熵规则四→复杂度阈值替代 token 水位 · 权层新增 skill_manage 即时规则进化能力。** |
 | **2.1.0** | **06-11** | **TAFA 三层互锁闭环重构。权层(655体系) + 能层(执行) + 审层(审计) 三层各司其职。新增互锁规则矩阵 + 违反后果 + 闭环保障。零脚本纯原生。** |
 | 2.0.3 | 06-07 | 权能三分（TAFA）术语替换 |
 | 2.0.2 | 06-07 | 新增降熵契约（能层协议） |
