@@ -2,7 +2,22 @@
 
 > **One person, an entire agent army.**
 > 权层定规则，能层干实事，审层管审计。制定规则的人不执行，执行规则的人不监督，监督执行的人不参与执行。
-> Architecture: Kernel + Skills (OpenClaw & Hermes dual-platform)
+
+## Why TAFA?
+
+The agent ecosystem is converging on single-layer swarms — OpenAI Swarm, Microsoft Agent Framework, Agency Swarm. All follow the same pattern: agents orchestrate agents, with quality left to external eval frameworks.
+
+**TAFA is structurally different:**
+
+| | Market (Swarm-style) | TAFA |
+|:--|:---------------------|:-----|
+| **Architecture** | Single-layer agent mesh | **Three-layer interlocked闭环** |
+| **Quality** | External eval (RagaAI, MLflow) | **Built-in Schema Gates at every handoff** |
+| **Feedback** | Human review → manual fix | **Phase 8 Self-Repair (<1min auto-patch)** |
+| **Permission** | API-key level | **4-Ring Privilege Model (structurally impossible to violate)** |
+| **Domain** | General-purpose | **Discipline inspection · Hospital audit · Compliance** |
+
+> *"Who audits the auditor?" — the question every agent framework avoids. TAFA answers it: Rule Layer sets rules, Execution Layer follows them, Audit Layer verifies both. Three layers, zero overlap.*
 
 ## Architecture
 

@@ -1,6 +1,6 @@
 ---
 name: "solo-audit"
-description: "SOLO Audit v5.8 — Hermes-Native: delegate_task + QQ Bot + 进化指标量化 + 膨胀自动检测 + 特权环合规审计。⛔ Confidential."
+description: "SOLO Audit v5.9 — Hermes-Native: delegate_task + QQ Bot + 进化指标量化 + 膨胀自动检测 + 特权环合规审计 + Agent级性能评估。⛔ Confidential."
 platforms:
   - openclaw
   - hermes
@@ -21,10 +21,10 @@ metadata:
     delivery: native_qqbot
 ---
 
-# SOLO 审计 Agent v5.8.0
+# SOLO 审计 Agent v5.9.0
 
 > 协议规范。四智能体管线：收集者不验证，验证者不判决，分析者推提案。
-> **v5.8 Hermes 655增强：** COLLECT新增进化指标+膨胀扫描 · ANALYZE新增特权环合规审计 · 655从设计原则升级为可量化活系统。
+> **v5.9 Agent性能评估：** COLLECT新增Agent级指标收集 · ANALYZE新增幻觉率/延迟/重试率分析 · 硬约束observation only。
 > v5.7 Hermes适配：`sessions_spawn` → `delegate_task` · `wecom_mcp` → QQ Bot原生交付。
 > v5.6 新增：Agent 1 COLLECT深化DI质量仪表板消费。
 
@@ -77,7 +77,12 @@ Agent 1 (COLLECT — 能层):
     - 闭环率 < 50% → 记录为 evidence 项 `[EVOLVE_STAGNATION]`
     - 回归数 > 0 → 记录为 evidence 项 `[REGRESSION_DETECTED]`
     - 文件不存在 → 标注 `[EVOLVE_METRICS_UNAVAILABLE]`
-  v5.8 新增 — 膨胀自动检测消费:
+  v5.9 新增 — Agent性能数据收集:
+    - 读取各管线的 pipeline_failure_log.json，提取 Gate B 失败率和 Agent 重试次数
+    - 记录各 Agent 的平均延迟（从 delegate_task 回传时间戳推算）
+    - 幻觉率 = VERIFY Agent 交叉验证中发现的虚假条款数 / 总条款数
+    - 输出到 evidence 文件时标注 `source: agent_performance`，不标 violation
+    - ⛔ Agent性能差不等于违规——仅作为 observation 记录
     - 运行 `python scripts/expansion-scan.py`
     - 读取 memory/.mev/expansion-scan.json
     - overall_status=🔴 → 记录为 evidence 项 `[EXPANSION_CRITICAL]`
@@ -171,6 +176,15 @@ type AuditResult = {
     mev_five: Array<{ layer: string, status: '✅' | '⏸️' | '❌', note?: string }>;
     principles: Array<{ principle: string, status: '✅' | '⏸️' | '❌', note?: string }>;
     governance: Array<{ dimension: string, status: '✅' | '⏸️' | '❌', note?: string }>;
+    // v5.9: Agent级性能指标 — observation only, 不产violation
+    agent_performance: Array<{
+      agent: string;               // "DI-Agent3" | "solo-audit-Agent2" | ...
+      hallucination_rate: number;  // 幻觉率 (0-1), 来源: VERIFY交叉验证发现的虚假条款比例
+      avg_latency_sec: number;     // 平均延迟(秒), 来源: COLLECT记录
+      retry_rate: number;          // 重试率 (0-1), 来源: pipeline_failure_log.json Gate B失败比例
+      trend: '改善' | '持平' | '恶化';  // 相对上次审计
+      observation?: string;        // ⛔ 仅记录，不等于violation
+    }>;
   };
   governance_records: Array<{ operation: string, ring: number, ring_name: string, result: string, reason: string }>;
   violations: Violation[];
@@ -339,7 +353,15 @@ ACTION: 只读分析，输出655对标报告:
      → 预期: 标记从装饰品变监控工具
      ```
 
-  6. 总体评级:
+  6. 【v5.9新增】Agent性能分析:
+     从 COLLECT 的 `source: agent_performance` evidence 中提取:
+     - 幻觉率 > 0.1 → 记录 observation（非violation），标注 [AGENT_HALLUCINATION_ELEVATED]
+     - 重试率 > 0.3 → 记录 observation，标注 [AGENT_RETRY_ELEVATED]
+     - 延迟 > 基线2倍 → 记录 observation
+     ⛔ 硬约束: agent_performance 不产生 violation，不映射到铁律，不触发 Proposal
+     只写入 alignment.agent_performance[] 和 655Analysis 的 observation 字段
+
+  7. 总体评级:
      🔴 需紧急处理: 存在高危violation + 跨期恶化 + 闭环率<50%
      🟡 需关注: 存在中危violation + 持平趋势
      🟢 健康: 仅低危violation + 改善趋势 + 闭环率>80%
@@ -375,6 +397,7 @@ RULES:
 | 2 | 原则 | 是否检测到膨胀陷阱模式？压缩/降熵原则是否有新违反？ |
 | 3 | MEV | 审计产出的质量在五层中哪一层最弱？Evolve层是否有闭环？ |
 | 4 | 综合 | 能否将N条violations归并为M=⌈N/2⌉条高阶建议？有哪些是跨期重复的？ |
+| 5 | Agent性能(v5.9) | 幻觉率/延迟/重试率有无异常？趋势恶化还是改善？⛔仅observation不产violation |
 
 ---
 
@@ -409,6 +432,7 @@ RULES:
 
 | 版本 | 日期 | 变更 |
 |:-----|:-----|:------|
+| **v5.9** | **2026-07-19** | **Agent级性能评估: alignment新增agent_performance维度(幻觉率·延迟·重试率)。COLLECT收集+ANALYZE分析。硬约束: observation only, 不产violation。** |
 | **v5.8** | **2026-07-19** | **655体系三大增强: Agent 1 COLLECT新增进化指标+膨胀扫描消费 · Agent 4 ANALYZE新增特权环合规子审计(铁律④) · 655从设计原则升级为可量化活系统。** |
 | **v5.6** | **2026-07-18** | **Agent 1 COLLECT新增DI质量仪表板消费——读取_pipeline_quality_log.json提取最近3次运行趋势偏离度，纳入evidence收集。** |
 | **v5.5** | **2026-07-09** | **§3.0 Step 5a新增意图路径验证门禁 + §3.2 VERIFY二次确认，降低审计false positive率。** |
