@@ -3,15 +3,6 @@ name: solo
 version: 3.0.0
 description: |
   SOLO v3.0 — TAFA权能三分架构·闭环SOP实战验证。审层发现违规→路由能层→能层提案→权层(Human in the Loop)审批→能层执行→护栏沉淀(归因·定位·固化·验证)。三级分流(P0·P1·OBS)·超时自动升级·趋势面板。首次闭环SP-030(2026-07-23,15分钟,3条P1全闭环)。一人成军。
-platforms:
-  - openclaw
-  - hermes
-tools:
-  - sessions_spawn
-  - delegate_task
-  - skill_manage
-  - cron
-  - read
 metadata:
   openclaw:
     emoji: ⛳
