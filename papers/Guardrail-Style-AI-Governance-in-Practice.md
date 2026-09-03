@@ -44,7 +44,7 @@ Feedback between layers is structural: capability layer output → audit layer e
 
 My system operates in a public hospital disciplinary inspection context, covering four domains:
 
-- **10-Agent DI Pipeline:** From issue scoping to final adjudication, fully automated disciplinary review qualitative report generation
+- **Four-Specialist-Agent DI Fleet (v3.0):** CT (clue triage) → IO (interview outline) → CD (determination & sentencing) → PD (recommendation drafting) — four always-on specialist agents in phase relay, each with its own model tier, context, and fail-closed security boundary
 - **5+ Scheduled Tasks:** Daily monitoring of healthcare policy, AI hotspots, compliance intelligence
 - **319 Regulatory Documents:** Full-text search in a local Wiki I built
 - **21 Specialized Skills:** OCR, Chinese search, CNKI retrieval, corporate database access, and more
@@ -128,13 +128,19 @@ This mechanism has ensured kernel stability: over four months, SOUL.md has only 
 
 ### 5.1 Pipeline Architecture
 
-My disciplinary review pipeline is the best embodiment of guardrail philosophy at the engineering level. Ten agents run sequentially, with each agent's output serving as the gate check for the next:
+My disciplinary review pipeline is the best embodiment of guardrail philosophy at the engineering level. In v3.0 the monolithic pipeline was refactored into four always-on specialist agents in phase relay — each agent consuming the previous phase's accepted output:
 
 ```
-Agent 0 (Scope) → Agent 1a∥1b (Parallel Regulation Search) → Agent 1c (Merge)
-→ Agent 2 (Audit) → Agent 3 (Dual-Round Debate) → Agent 4 (Draft)
-→ Agent 5 (Review) → Agent 6 (Revise) → Agent 7 (Publish) → Agent 8 (Self-Repair)
+[CT] Clue Triage ── lead intake, multi-source verification, checkability analysis, four dispositions
+[IO] Interview Outline ── four-stage question handbook, four elements per question, breakthrough design
+[CD] Determination & Sentencing ── violation+culpability dual-factor, three questions, adversarial debate, eight-dimension review
+[PD] Recommendation Drafting ── five-part document, 80-point quality gate, citation-verified
 ```
+
+- **Failure isolation:** one specialist stuck/down does not stall the rest of the chain
+- **Focused context:** each specialist holds only its stage's material — no cross-case pollution
+- **Clear accountability:** a defect in any stage maps directly to one specialist
+- **Structural security:** every specialist fails closed (empty fallback providers) — L2 case data has no egress path by construction
 
 ### 5.2 Gate Design
 
