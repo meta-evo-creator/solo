@@ -1,7 +1,7 @@
 ---
 name: solo
-version: 3.0.0
-description: "SOLO v3.0 - TAFA three-tier Authority-Function-Review architecture with closed-loop SOP practice. Review tier detects violations, routes to Function tier, Function tier proposes, Authority tier (Human-in-the-Loop) approves, Function tier executes, guardrails consolidated. Three-level routing (P0, P1, OBS), timeout auto-escalation, trend dashboard. First closed loop SP-030 (2026-07-23, 15 minutes, 3 P1 fully closed). One-person army."
+version: 3.2.0
+description: SOLO v3.2 Use when working with the SOLO755 rule set (TAFA rule layer) or running closed-loop SOP practice.
 metadata:
   openclaw:
     emoji: ⛳
@@ -11,398 +11,108 @@ metadata:
       - delegate_task_pipeline
       - native_qqbot_delivery
 ---
-# SOLO v3.0 ⚡ — TAFA 权能三分架构 · 闭环SOP
 
-> **One person, an entire agent army.**
-> 权层定规则，能层干实事，审层管审计。制定规则的人不执行，执行规则的人不监督，监督执行的人不参与执行。
-> **v3.0：闭环SOP实战验证。首次完整闭环 SP-030（2026-07-23 22:48→23:10，15分钟，3条P1全闭环）。**
-> **Human in the Loop = 权层审批。没有这道门，AI修AI的bug——迟早闯祸。**
+# SOLO v3.2 ⚡ — TAFA Tripartite Architecture · Closed-Loop SOP
 
----
-
-## 架构总览：三层互锁闭环
-
-```
-┌───────────────────────────────────────────────────────────────────┐
-│                    ① 权层（Rule Layer）——规则制定                  │
-│                                                                   │
-│  655体系：6铁律(SOUL.md) + 5原则 + 5MEV                          │
-│  Suit门禁 · 工具护栏 · 搜索降级链                                 │
-│                                                                   │
-│  制定规则，但绝不参与任何一次执行或审计。                           │
-│  规则只追加不修改，审计提案经审批→追加。                           │
-│              │                          ▲                         │
-│    规则下发约束                        │ 审计反馈·规则进化          │
-│              ▼                          │                         │
-├───────────────────────────────────────────────────────────────────┤
-│                    ② 能层（Execution Layer）——任务执行              │
-│                                                                   │
-│  cron / 技能管线 / sessions_spawn                                 │
-│  MSF · DI · HI · SI · babata-browser · babata-search             │
-│                                                                   │
-│  严格执行权层规则（Suit门禁自检+铁律自检），但无权修改任何一条。    │
-│  执行产出留给审层审计，不自行审查。                                 │
-│              │                                                    │
-│    执行产出交审                                                  │
-│              ▼                                                    │
-├───────────────────────────────────────────────────────────────────┤
-│                    ③ 审层（Audit Layer）——独立审计                  │
-│                                                                   │
-│  skills/solo-audit/ — Pro模型独占                                 │
-│  只读工具（read/exec只读/cron runs）                               │
-│  只提提案不执行 · 铁律+MEV+原则+文件结构五表对标                    │
-│                                                                   │
-│  审计执行层，但不参与执行。审计产出→提案→权层审批→规则进化。       │
-│  审层自身受权层「谦抑铁律」约束，不能扩权。                        │
-└───────────────────────────────────────────────────────────────────┘
-```
-
-### 互锁闭环运转逻辑
-
-```
-权层(定规则) → 能层(执行) → 审层(审计)
-  │               │              │
-  │ 755铁律       │ cron/DI      │ 发现违规
-  │ Suit门禁      │ 每日运行     │ P0/P1/OBS
-  └──────→ 能层执行 ────→ 审层审计
-                              │
-                         ⏵ 路由能层
-                              │
-                         ① 能层提案 → 权层审批(Human in the Loop)
-                              │              ↓
-                         ① 能层执行修复 ←  ✅通过
-                              │
-                         ② 能层护栏 🛡️归因·定位·固化·验证
-                              │
-                         ③ 审层验证 → 下次审计检查
-```
-
-**完整循环**：权层定规则 → 能层执行 → 审层发现违规 → 路由能层 → 能层提案 → 权层审批 → 能层修复 → 护栏沉淀 → 审层下次验证。
+> The rule layer sets rules, the execution layer does the work, the audit layer audits. Whoever sets rules never executes; whoever executes never audits; whoever audits never executes.
+> **Human in the Loop = approval by the rule layer.** Without this gate, AI ends up fixing AI's own bugs — it is only a matter of time before it blows up.
+> **TAFA** = Tripartite Authority-Function Architecture. Institutional isomorphism: it inherits the governance gene of Chinese public hospitals — "Party committee decides → president executes → discipline inspection committee oversees" — rather than importing a Western separation-of-powers model into AI governance.
 
 ---
 
-## 一、权层（Rule Layer）—— 规则制定，不参与执行
+## 1. Three Layers and Their Boundaries
 
-### 1.1 655体系
+| Layer | Who | Only does | Must never do |
+|:--|:--|:--|:--|
+| **Rule layer** | The human owner (Human in the Loop) | Sets and appends rules, approves changes | Write execution logic, run tasks, write cron payloads |
+| **Execution layer** | Agents / cron / skill pipelines | Execute per rules, raise proposals, precipitate guardrails | Change rules, self-audit, act first and check afterwards |
+| **Audit layer** | `solo-audit` (heterogeneous model, read-only) | Audit, produce proposals, route them | Execute, edit files, expand its own authority or scope |
 
-| 层次 | 内容 | 位置 | 特性 |
-|:-----|:-----|:-----|:-----|
-| 6铁律 | 隐私/溯源/免疫/权责/惜文件/谦逊 | SOUL.md §内核铁律 | 是非判断，阻断级 |
-| 5原则 | 膨胀陷阱(基石)+纯净/压缩/优先/降熵(输出) | solo-audit SKILL.md §4.3 | 设计取舍，审计对标 |
-| 5MEV | Suit/Sense/Think/Optimize/Evolve | SOUL.md §MEV五层 | 过程质量，方法论 |
-
-**注意：** 655是权层的规则集，不是SOLO的全部。SOLO的完整形态是TAFA三层互锁闭环。
-
-### 1.2 规则变更流程
-
-```
-审层提案 → 审批 → 权层追加 → 能层下次执行时自动加载
-                                  ↑
-                         审层每日审计校验是否已执行
-```
-
-- 规则只追加不修改（可补充解释，不可删除降级）
-- 能层不能自行绕过或降级权层的任何规则
-
-### 1.3 所有权文件
-
-| 文件 | 职责 |
-|:-----|:------|
-| SOUL.md | 六条铁律 + MEV五层 + 身份核心 |
-| AGENTS.md | 工作区规则 + 技能路由 + 记忆体系 |
-| TOOLS.md | 工具护栏 + 搜索降级链 + 反爬规则 |
-| .sop/ | 标准化SOP（由权层审批通过后写入） |
+Closed loop: rule layer sets rules → execution layer executes → audit layer finds violations → routes to execution layer → proposal → rule layer approves → fix → guardrail precipitation → audit layer re-verifies.
+Crossing a layer boundary is `[UNAUTHORIZED_MODIFICATION]`, recorded and pushed by the daily audit. Swimlane details → `references/tafa-loop-sop.md`.
 
 ---
 
-## 二、能层（Execution Layer）—— 任务执行，不自我审查
+## 2. Change Gate (any change to rules / config / cron payload / skill tree / memory · six steps, one chain, no skipping)
 
-### 2.1 执行技能管线
+**Step 0 — Iron Laws.** Ask yourself the seven iron laws one by one; if any one fails, stop.
+**Step 1 — Layer.** Is this an execution-layer action, or does it touch the rule layer? **Crossing the boundary → propose only, never execute**, and do not ask back "shall I change it for you".
+**Step 2 — Three Cards** (parent principle = Expansion Trap · if any card fails, do not put forward the proposal):
+　　① Which existing rule should already have covered this? Why did it fail to? (causal question · not "is it covered")
+　　② Is adding a rule substituting for the elimination path?　③ Is the new rule orthogonal and non-overlapping?
+**Step 3 — Authority.** Which layer am I in, and am I entitled to this action?
+**Step 4 — Approval.** Show first; execute only after approval.
+　　**Authorization is recognised by the verb**: `"approved"` / `"yes, do it as you proposed"` is approval; `"execution-layer analysis, proposed fix below"` (e.g. relaying a cron suggestion) is **delegated analysis, not an execution order** — never read the word "fix" alone as approval.
+**Step 5 — Leave a Trace, Create the Card (R2).** Any Ring-3 change must leave a kanban card, and the card must carry `--initial-status blocked`: the `⏳pending-approval` title is only a text prefix and the state machine does not honour it (actual case: two minutes after the card was created, auto-decomposer promoted it and directly edited a skill file). Promote with `kanban promote <id>` only after the human owner nods. Creating cards for one batch and skipping the next = ledger mismatch, which the audit layer treats as a gap.
+**Step 6 — Precipitation Sheet (R3).** In the same reply, give the four steps (attribution → localisation → solidification → verification). Missing one step means **not done**; never report "fixed".
 
-| 技能 | 触发方式 | 产出 |
-|:-----|:---------|:-----|
-| AI圈热点监测 (cron-ai-hotspot) | cron 04:00 | 技术商业信号报告 |
-| 医院智慧监督 (cron-hospital) | cron 06:00 | 医疗政策监督情报 |
-| AI医疗案例 (cron-aimed) | cron 09:00 | AI+医疗企业案例 |
-| 法规月度巡检 | cron 每月1日 10:00 | 全库版本检查 |
-| MSF | 按需触发 | 医学组织研究 |
-| DI | 按需触发 | 纪律审查分析 |
-| HI | 按需触发 | 医院巡查分析 |
-| SI | 按需触发 | 巡视监督分析 |
-| babata-browser | 按需触发 | 反爬页面抓取 |
-| babata-search | 按需触发 | 中文搜索 |
-| deep-research | 按需触发 | 深度调研 |
-
-### 2.2 能层执行铁律
-
-1. **执行前：** Suit门禁自检（Step 0 铁律六条全过才放行）
-2. **执行中：** 受权层工具护栏约束（搜索降级链·反爬规则）
-3. **执行后：** 产出不自行审查——留给审层审计
-4. **禁止：** 修改权层任何文件 · 绕过Suit门禁 · 自审自评
-
-### 2.3 降熵契约（通用强制协议）
-
-> 对应权层5原则之④「降熵」：主会话只存结构化摘要，子会话承载具体任务。
-> **本契约适用于所有使用 sessions_spawn 的技能/任务，不限于 SI/DI/HI。**
-
-#### 规则一：子会话回传压缩（所有 sessions_spawn 协议）
-
-```
-DONE <输出文件路径>
-摘要: ≤3行
-异常: ⚠️ 有/无
-```
-
-**禁止在主会话读取子代理产出文件的全文。** 主会话只记录完成状态和文件路径。子代理摘要由Hermes delegate_task原生处理。
-
-> **边界说明：** 本规则的隔离目标是**主会话不因接管子代理工作而读产出全文**。子代理之间因管线阶段递进而读取前序产出（如Merge读Scout、Draft读Analyze）属于**必要的上下传递**，不受此规则约束。DR等管线中的Draft Agent声明`input_authority: read_raw_scout_data`属于正常的上文传递，无需视为例外。
-
-#### 规则二：文件验证压缩
-
-收到子代理 DONE 后，文件验证**只检查存在性，不读内容**：
-```
-read <output_file_path> → 仅检查文件存在（size > 0 即可）
-文件存在 → 记录路径
-文件不存在 → 标记 failed → 报告异常
-```
-
-#### 规则三：Draft/分析阶段强制子会话隔离
-
-涉及撰写报告、底稿、提纲、分析文档的阶段，**必须 spawn 子代理执行**，禁止在主会话执行：
-```
-主会话只做：spawn → 等待 Done → 验证文件存在 → 进入下一阶段
-子代理做：读输入文件 → 分析/撰写 → 写输出文件
-```
-
-#### 规则四：主会话健康度自检
-
-**OpenClaw 原版**：每次 sessions_spawn 前检查 `session_status` token 水位。
-
-**Hermes v2.2 替代方案**：
-由于 Hermes 无 `session_status` 等效工具，改用**复杂度阈值**替代 token 水位：
-
-- **简单任务（≤2步）** → 主会话直接执行
-- **复杂任务（3+步 / 需多视角分析）** → `delegate_task` 后台执行
-- **管线任务（多 Agent 编排）** → 主会话仅做调度，所有实质性工作 delegate
-
-> **底层逻辑**：`delegate_task` 本身就在独立上下文中运行，天然防膨胀。不需要查 token 水位——只要任务够复杂就 delegate。
-
-#### 例外清单
-
-以下操作允许在主会话直接执行：
-1. IMA 上传（Phase 7 type: 主会话直调）
-2. 最终交付摘要（≤3行）
-3. 管线异常报告（仅当 FAIL/HUMAN_ESCALATION）
-4. 单步工具调用（搜索/OCR/爬取等 L1 任务）
-
-#### 规则五：大内容隔离（v2.2 Hermes新增）
-
-> 对应无 `session_status` 的盲区——简单任务也可能导致上下文膨胀。
-
-- **单次 `read_file` 返回 >200 行** → 主会话不得直接展示全文。先写临时文件，再输出 ≤3 行摘要 + 文件路径。
-- **搜索结果 >10 条** → 先写临时文件，再输出最相关的 3 条 + 完整结果路径。
-- **子代理回传 >500 字** → 降熵违规。Hermes delegate_task 原生处理摘要长度，超出部分自动截断。
-- **delegate_task 子代理内部读取不受此限**——子代理有独立上下文，可以读完整文件进行分析。
-
-#### 弹性规则（基于 655「优先」原则：安全>准确>纯净>效率）
-
-**1. 按需检索（防止降熵过度）**
-
-子代理在 spawn prompt 中可**显式授权**读取上游原始数据（如 Scout 输出的完整JSON），不违反降熵契约。
-
-规则：
-- 主会话不自动读全文（防线不变）
-- 子代理 spawn 时如果声明 `input_authority: read_raw_scout_data`，可直接 read 上游原始文件
-- 但子代理自己的回传仍需压缩（DONE+路径+3行）
-
-**2. 进度回传（防止黑盒执行）**
-
-子代理回传可额外包含进度信息，用于主会话回答「现在到什么阶段了？」：
-```
-DONE <路径>
-摘要: ≤3行
-异常: ⚠️ 有/无
-进度: 当前阶段/总阶段 预估剩余
-```
-
-**3. 管线深度可调（防止过度分层）**
-
-中等复杂度任务（如公司分析/行业调研），经评估后可以合并阶段减少子代理层级：
-- Scouts（不变，3路并行有效）
-- Analyze + Draft 可合并为一个 Agent（减少一次 spawn 开销）
-- Review（保留，质量控制防线不变）
-
-评估标准：
-- 任务需要多少独立视角？→ 多视角需保留 Analyze 分层
-- 原始数据量多大？→ 数据量大需保留 Scout 分层
-- 容错要求多高？→ 低容错任务需保留 Review 分层
-
-#### 违反后果
-
-降熵契约受 solo-audit 审层每日审计。违反记录为 `[ENTROPY_VIOLATION]`，计入审计提案。
+**Forbidden**: editing the authoritative rule-layer files · bypassing the Suit gate · self-auditing · acting first and checking afterwards (using principles as exit labels).
+> Criterion: **guardrails do not rely on self-discipline.** The point of the six steps is to turn "I would remember to do it" into a mechanical requirement.
+> Lesson (2026-11-10): reading a config and finding "a stale value / a missing alias" was immediately reported as a hidden danger, along with a question whether to change it — card ① alone stops this (an existing fallback already covers it), card ② stops it too (a new alias is a duplicate channel). Before reporting a hidden danger, run the trigger path once; only report what actually fails; if you have not run it, label the claim "inferred".
+> Default delivery is **zero new behaviour**: only plug, absorb, record; anything new must be counter-proven by an incident — twice in the same shape, or one real loss that the consequence layer could not stop.
 
 ---
 
-## 三、审层（Audit Layer）—— 独立审计 · 闭环执行
+## 3. Rule Layer: 755 and the Change Process
 
-### 3.1 闭环SOP（v3.0核心·每次审计的标准操作流程）
+755 = seven iron laws (privacy · provenance · injection immunity · authority-and-responsibility · cherish files · humility · honesty | SOUL §core iron laws | blocking severity)
+　　+ five principles (expansion trap · minimalism · priority · entropy reduction · guardrails | design trade-offs · audit benchmarks)
+　　+ five MEV layers (Suit / Sense / Think / Optimize / Evolve | process quality)
 
-```
-审层(Pro·只读)              能层(Flash·读写)              权层(石冰·人)
-  │                            │                            │
-  ├─ 每日21:00审计              │                            │
-  ├─ 发现违规→P0/P1/OBS分级     │                            │
-  ├─ ⏵ 路由至能层[x] ──────→   │                            │
-  │  P0→权层审批                │                            │
-  │  P1→能层自动提案            │                            │
-  │  OBS→仅记录                 │                            │
-  │                            ├─ ① 能层执行 ──────────┐    │
-  │                            │  分析根因·提案方案      │    │
-  │                            │  影响范围·回滚准备      │    │
-  │                            │        │               │    │
-  │                            │   提交权层审批 ────────→│    │
-  │                            │        │               ├─ 审批│
-  │                            │        │    ✅/❌ ←───┘    │
-  │                            │        │                    │
-  │                            │  执行修复                  │
-  │                            │        │                    │
-  │                            ├─ ② 能层护栏 ──────────┐    │
-  │                            │  🛡️ 归因（错在哪）     │    │
-  │                            │  🛡️ 定位（堵在哪）     │    │
-  │                            │  🛡️ 固化（写进规则）   │    │
-  │                            │  🛡️ 触发复测（真有效？）│    │
-  │                            │        │               │    │
-  │                            │   护栏已沉淀 ←─────────┘    │
-  │                            │        │                    │
-  │   ←── ③ 审层验证 ─────────┘        │                    │
-  │  下次审计：护栏生效？复发？          │                    │
-  │  趋势面板更新                       │                    │
-  └─ 闭环完成                          │                    │
+- 755 is the rule layer's rule set, not the whole of SOLO; the complete form is the TAFA three-layer interlocking loop.
+- Externally: 755 and TAFA are **two faces of one system** and must not be described as two systems (correction of 2026-08-09); do not say "separation / checks and balance of powers" — say "restraint and supervision", "rule constraints".
+- Authoritative rule-layer files: `SOUL.md` (seven iron laws + MEV), `AGENTS.md` (routing + memory), `TOOLS.md` (tool guardrails). This document describes architecture and process; where criteria conflict, the authoritative files win.
 
-三层不交叉：审层只审计·能层只执行+沉淀·权层只审批
-```
-
-| 等级 | 审批 | 超时 | 判定 |
-|:----:|:----:|:----:|:-----|
-| 🔴P0 | 权层批方案 | 不过期·不自动升级 | 隐私·权责·数据丢失·生产 |
-| ⚠️P1 | 权层批方案 | >24h→升P0 | 路径·格式·验证·阈值 |
-| 🔵OBS | — | 恶化→升P1 | 性能·趋势·非紧迫 |
-
-P0/P1 同需：护栏沉淀(归因·定位·固化·验证) → 审层下次验证
-
-超时规则：P1>24h→升P0 · 执行>12h→提醒 · 沉淀>48h→OBS
-趋势面板：每次审计附本月统计
-首次闭环：SP-030（2026-07-23，15分钟，3条P1全闭环）
-
-### 3.2 审计引擎
-
-**独立技能：** `skills/solo-audit/SKILL.md` v6.2
-
-| 属性 | 配置 |
-|:-----|:-----|
-| 模型 | **Pro（强制）** |
-| Agent 管线 | delegate_task |
-| 推送 | QQ Bot（原生交付） |
-| 工具 | 只读 allowlist |
-| 周期 | 每日21:00 |
-| 证据护栏 | 无工具输出→不得列违规 |
-| 审谦约束 | 审层=能层是先天限制·Pro+只读已是最佳缓解 |
-
-### 3.2 五表对标
-
-| 对标表 | 来源 | 审计什么 |
-|:-------|:-----|:---------|
-| 铁律6条 | SOUL.md | 是非判断——做了没？ |
-| MEV 5层 | SOUL.md | 过程质量——做得好不好？ |
-| 原则5项 | solo-audit §4.3 | 设计取舍——设计对不对？ |
-| 版本对齐 | PLUGIN-REGISTRY.md | fleet同步——版本一致吗？ |
-| 文件结构 | 工作区 | 膨胀陷阱——有没有堆砌？ |
-
-### 3.3 审层谦抑约束
-
-- 审层只读不写，只提提案不做执行
-- 不确定时标注[不确定]，不推断
-- 不扩展审查范围，不越权
-- 审层自身受权层「谦抑铁律」约束
+**Change process**: audit proposal → rule-layer approval → rule-layer append → execution layer picks it up on next load; the daily audit verifies whether it was executed. Rules are append-only (explanations may be added, no deletion or downgrade); the execution layer may neither bypass nor downgrade them. Audit repository: `memory/audit/` (archive / knowledge / meta).
 
 ---
 
-## 四、三层互锁机制详解
+## 4. Audit Layer: Three Things Only
 
-### 4.1 互锁规则矩阵
+- **What it looks at**: the 7 iron laws (was it done?) · the 5 MEV layers (how well was it done?) · the 5 principles (was the design right?) · version alignment (`PLUGIN-REGISTRY.md`) · file structure (is anything piling up?).
+- **Triage**: 🔴P0 rule-layer approves the plan · never expires, never auto-escalates (privacy / authority / data loss / production) ｜ ⚠️P1 rule-layer approves the plan · >24h escalates to P0 (path / format / verification / threshold) ｜ 🔵OBS record only · escalate to P1 if it worsens.
+- **Timeouts**: execution >12h → reminder · precipitation >48h → downgrade to OBS; every audit carries the month's trend statistics.
+- **Not allowed**: write instead of read · execute instead of propose · infer instead of marking `[uncertain]` · widen scope · exceed the humility constraint.
 
-| 从\到 | 权层 | 能层 | 审层 |
-|:------|:----:|:----:|:----:|
-| **权层** | — | 下发655规则约束 | 接收审计提案→进化 |
-| **能层** | 执行权层规则 | — | 接受审计→整改 |
-| **审层** | 输出审计提案 | 审查执行产出 | — |
-
-### 4.2 违反互锁的后果
-
-| 违反模式 | 示例 | 后果 |
-|:---------|:-----|:-----|
-| 能层自审 | 执行后自行写审计报告 | 违反「执行不监督」，审层审计提出 |
-| 能层修改规则 | 绕过Suit门禁直接写法规分析 | 违反「执行不制定规则」，阻塞任务 |
-| 审层参与执行 | 审计时顺手修改文件 | 违反「监督不执行」，提案失效 |
-| 权层参与执行 | 在SOUL.md里写cron payload | 违反「制定不执行」，应剥离 |
-| **任何层越权改规则** | **未经655对照+审批直接改cron payload** | **违反「权责两清」，审计记录为`[UNAUTHORIZED_MODIFICATION]`** |
-
-#### 规则变更防火墙（三层通用·每次修改前执行）
-
-任何层修改已有规则/配置/cron payload 前，必须执行三步骤检查：
-
-```
-Step 1: 655对照——这个修改对应哪个原则？是否已被现有覆盖？是不是膨胀陷阱？
-        检查卡：①是否已有规则覆盖此需求  ②是不是加规则替代了消除路径  ③新规则是否正交不重叠
-Step 2: 权责确认——我所在的层有权做这个修改吗？
-        权层→只能追加规则，不能写执行逻辑
-        能层→只能按规则执行，不能改规则
-        审层→只能提案，不能直接改
-Step 3: 审批——修改前展示·审批通过后才执行
-```
-
-违反视为 `[UNAUTHORIZED_MODIFICATION]`，在每日审计中记录并推送。
-
-### 4.3 闭环保障
-
-```
-  权层制定规则
-    → Suit门禁强制所有能层启动时加载
-    → 能层按规则执行
-    → 执行产出写入审计仓库
-    → 审层每日读取审计仓库
-    → 审层输出审计提案到 memory/audit/archive/
-    → 审计提案经审批
-    → 审批通过的规则变更追加到权层
-    → 回到第一步
-```
+Engine specification, five-table benchmarking detail, and evidence guardrails → `skills/solo-audit/SKILL.md` (single source of truth; not repeated here).
 
 ---
 
-## 五、算子目录
+## 5. Operational Semantics (five pits learned the hard way)
 
-| 文件 | 所属层 | 用途 |
-|:-----|:------:|:-----|
-| SOUL.md · AGENTS.md · TOOLS.md | 权层 | 规则制定与工具护栏 |
-| .sop/ | 权层 | 标准化SOP |
-| skills/solo/SKILL.md | 元 | 本文档（TAFA架构描述） |
-| skills/solo-audit/ | 审层 | 独立审计技能 |
-| skills/msf/ · di/ · hi/ · si/ | 能层 | 各任务管线 |
-| skills/babata-browser/ · babata-search/ | 能层 | 搜索抓取工具链 |
-| skills/deep-research/ · party-review/ | 能层 | 分析评审管线 |
-| memory/audit/ | 审层 | 审计仓库（archive/knowledge/meta） |
-| memory/会话日志/ | — | 已废弃（cron22 Step 9已移除） |
+1. **Approval tokens are counted per operation, and a failed operation still burns one** — `skill_gate approve --skill X --op patch --n N --minutes M --file <exact file> --from-msg <verbatim message>`. Every operation in one call consumes a token, and **a non-matching `old_string` consumes one too**, so confirm the anchor before minting.
+2. **Always pass `file_path` when editing references** — without it, `skill_manage` edits SKILL.md; if one operation in a batch fails the whole batch is rolled back.
+3. **Memory goes through `--target`, not `--skill`** — `approve --target memory --op memory_write`; using `--skill` returns "illegal --op".
+4. **Always read back after editing CJK text** — a successful `patch` does not mean the characters are right; re-read those lines and check the literal text (real cases: "cherish" written as "panic", a common word replaced by a rare variant).
+5. **Clear tokens at the end** — `skill_gate revoke`, then `skill_gate ls` must be 0/0.
+
+> Test discipline: regression tests must inline their fixtures and must not anchor on the day's live files; numeric assertions (cron count, skill count) must be obtained by running the command first.
 
 ---
+
+## 6. Entropy Reduction Contract (criteria here · full text in `references/entropy-contract.md`)
+
+Corresponds to principle ④ "entropy reduction". Applies to every `sessions_spawn` / `delegate_task`. Any violation is `[ENTROPY_VIOLATION]` and enters the audit proposals.
+
+1. A sub-agent returns only `DONE <path>` + a summary of ≤3 lines + whether an exception occurred.
+2. The main session **does not read** sub-agent output in full; verification checks existence only (size>0).
+3. Drafting / base-copy / outline / analysis stages **must** run in sub-agents; the main session only dispatches.
+4. Complexity threshold instead of token watermark: ≤2 steps do it in the main session · 3+ steps delegate · multi-agent orchestration only dispatches.
+5. A single read_file >200 lines / search results >10 items → land them in a temp file first, return only a 3-line summary + path.
+6. Exceptions doable in the main session: IMA upload · final delivery summary ≤3 lines · FAIL / HUMAN_ESCALATION reports · single tool calls.
+7. Passing context between pipeline stages (Merge reading Scout, Draft reading Analyze) is unrestricted; declaring `input_authority: read_raw_scout_data` at spawn time allows reading upstream originals.
+
+---
+
+## 7. References (29 files · two tiers)
+
+**Nine essentials**: `tafa-loop-sop.md` (closed-loop swimlanes) · `entropy-contract.md` (full entropy contract) · `audit-agent-v2.2.md` (audit-layer spec · model pinned by solo-audit and cron) · `changelog.md` (full 2.0.0→3.2 table) · `mev-framework-en.md` (source of MEV) · `tafa-kanban-integration.md` (card workflow) · `hermes-pitfalls.md` (platform pitfalls) · `ops-lessons-20260719.md` (ops discipline) · `honesty.md` (honesty collection).
+
+**Consult on demand**: tafa-closed-loop · tafa-self-audit-trap · decisions-archive · memory-architecture · schema · eval-loop · hermes-migration · hermes-adaptation-guide · hermes-native-capabilities · hermes-studio-deploy · 2026-07-19-migration-lessons · 2026-07-24-capabilities-and-guardrails · temp-file-cleanup · tts-setup · di-routing-format-rules · opensource-publish · desensitization-checklist · promotion-guide · intro-scripts · ima-api.
+
+**No snapshots in the body**: the cron inventory lives in `cron/jobs.json`, the skill inventory in `ls skills/*/SKILL.md` — this file states criteria only, it does not record numbers that rot.
 
 ## Changelog
 
-| 版本 | 日期 | 变化 |
-|:-----|:----:|:------|
-| **3.0.0** | **07-23** | **闭环SOP实战验证。首次完整闭环SP-030(15分钟3条P1全闭环)。Human in the Loop=权层审批。三级分流(P0/P1/OBS)·超时自动升级·趋势面板·护栏沉淀四步(归因→定位→固化→验证)。审层切Pro·审计周期22:00→21:00。** |
-| **2.2.0** | **07-19** | **Hermes 全平台适配。** |
-| **2.1.0** | **06-11** | **TAFA 三层互锁闭环重构。权层(655体系) + 能层(执行) + 审层(审计) 三层各司其职。新增互锁规则矩阵 + 违反后果 + 闭环保障。零脚本纯原生。** |
-| 2.0.3 | 06-07 | 权能三分（TAFA）术语替换 |
-| 2.0.2 | 06-07 | 新增降熵契约（能层协议） |
-| 2.0.1 | 05-24 | 新增管线状态协议 |
-| 2.0.0 | 05-23 | TAFA重写 |
+> Full version history → `references/changelog.md`.
+> - **11-18 v3.2** Structural condensation: architecture diagram and operator catalogue removed (their information moved into the §1 table and the §3 authoritative-files line); the gate was merged into one six-step chain (previous §2.2 + R1–R3 + §4.2); audit-layer detail pushed down into `solo-audit`; new §5 operational semantics; references split into two tiers; the body no longer records cron/skill counts. Zero criteria removed.
