@@ -1,9 +1,4 @@
 {
   "slug": "solo",
-  "version": "2.2.0",
-  "publishedAt": 1780583448875,
-  "skills": {
-    "discipline-inspection": "2.6.0",
-    "solo-audit": "5.9.0"
-  }
+  "version": "3.2.0"
 }
